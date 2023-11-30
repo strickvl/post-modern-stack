@@ -36,9 +36,10 @@ class LSTMRecModel(RecModel):
             batch_sessions = sessions_padded[idx: idx+bs]
             raw_predictions = self.model.predict(batch_sessions, batch_size=128)
             sorted_indices = np.argsort(raw_predictions, axis=-1)[:, -k:][:, ::-1]
-            for idx in range(len(sorted_indices)):
-                predictions.append([self.tokenizer.index_word[i+1] for i in sorted_indices[idx]])
-
+            predictions.extend(
+                [self.tokenizer.index_word[i + 1] for i in sorted_indices[idx]]
+                for idx in range(len(sorted_indices))
+            )
         return predictions
 
 

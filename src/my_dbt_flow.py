@@ -82,11 +82,11 @@ class dbtFlow(FlowSpec):
         Start-up: check everything works or fail fast!
         """
         # print out some debug info
-        print("flow name: %s" % current.flow_name)
-        print("run id: %s" % current.run_id)
-        print("username: %s" % current.username)
+        print(f"flow name: {current.flow_name}")
+        print(f"run id: {current.run_id}")
+        print(f"username: {current.username}")
         if os.environ.get('EN_BATCH', '0') == '1':
-            print("ATTENTION: AWS BATCH ENABLED!") 
+            print("ATTENTION: AWS BATCH ENABLED!")
         print(os.getenv('AWS_DEFAULT_REGION'))
         # make sure we can use the training image as an env
         os.environ['TRAIN_STEP_IMAGE'] = self.TRAINING_IMAGE
@@ -131,7 +131,7 @@ class dbtFlow(FlowSpec):
         arbitrary flows. It is included here as a bonus feature to showcase how deep the interplay
         between Metaflow and dbt can really be (thanks valay for the pointers!) 
         """
-        local_filepath = current_path + "/dbt/target/manifest.json"
+        local_filepath = f"{current_path}/dbt/target/manifest.json"
         # debug
         print(local_filepath)
         with open(local_filepath) as f:
@@ -160,10 +160,10 @@ class dbtFlow(FlowSpec):
                     if upstream_node_type == "model":
                         dbt_dag[upstream_node]['next'] = [node]
 
-        for node in dbt_dag.keys():
+        for node in dbt_dag:
             # node not upstream of anything
             if node != 'end' and not dbt_dag[node]['next']:
-                print("End node is: {}".format(node))
+                print(f"End node is: {node}")
                 dbt_dag[node]['next'] = ['end']
                 break
 
@@ -192,22 +192,26 @@ class dbtFlow(FlowSpec):
                 account_id=int(os.getenv('DBT_ACCOUNT_ID')),
                 project_id=int(os.getenv('DBT_PROJECT_ID')),
                 job_id=int(os.getenv('DBT_JOB_ID')),
-                cause='{}|{}|{}'.format(current.flow_name, current.run_id, current.username),
-                dbt_cloud_api_key=os.getenv('DBT_API_KEY')
+                cause=f'{current.flow_name}|{current.run_id}|{current.username}',
+                dbt_cloud_api_key=os.getenv('DBT_API_KEY'),
             )
             dbt_runner.run_job()
         else:
-            my_dir = os.path.dirname(os.path.realpath(__file__)) 
+            my_dir = os.path.dirname(os.path.realpath(__file__))
             dbt_cmd = "dbt run --vars '{SF_SCHEMA: %s, SF_TABLE: %s}'"  % (os.getenv('SF_SCHEMA'), os.getenv('SF_TABLE'))
             # debug
-            print("dir is {}, dbt command is: {}".format(my_dir, dbt_cmd))
+            print(f"dir is {my_dir}, dbt command is: {dbt_cmd}")
             # run dbt from python
-            process = subprocess.Popen([
-                'source {}; {}'.format(os.path.join(os.getenv('VIRTUAL_ENV'), 'bin/activate'), dbt_cmd)
-                ], cwd=os.path.join(my_dir, 'dbt/'), shell=True)
+            process = subprocess.Popen(
+                [
+                    f"source {os.path.join(os.getenv('VIRTUAL_ENV'), 'bin/activate')}; {dbt_cmd}"
+                ],
+                cwd=os.path.join(my_dir, 'dbt/'),
+                shell=True,
+            )
             process.communicate()
             if process.returncode != 0:
-                raise Exception('dbt invocation returned exit code {}'.format(process.returncode))
+                raise Exception(f'dbt invocation returned exit code {process.returncode}')
             # build a card
             current_path = str(Path(__file__).resolve().parent)
             self.dbt_dag = self.get_dag_from_manifest(current_path)
@@ -244,7 +248,7 @@ class dbtFlow(FlowSpec):
             ORDER BY se."SESSION_DATE" ASC -- sessions are ordered!
         """
         # debug
-        print("Query to be exectued: {}".format(query))
+        print(f"Query to be exectued: {query}")
         params = {
             'api_key': os.getenv('APPLICATION_API_KEY'),
             'start_date': self.START_DATE,
@@ -257,23 +261,23 @@ class dbtFlow(FlowSpec):
         # in this case, we simply take the last 10% of sessions
         # NOTE: data is ordered by time asc
         split_index = int(len(self.dataset) * 0.90)
-        print("Split index is {}".format(split_index))
+        print(f"Split index is {split_index}")
         # version also the train / test split and print some quick number
         # NOTE: "INTERACTIONS" are JSON-ified string, so we need to load them
         self.train_dataset = [json.loads(row['INTERACTIONS']) for row in self.dataset[:split_index]]
-        self.test_dataset = [json.loads(row['INTERACTIONS']) for row in self.dataset[split_index:]]        
-        print("# {} events in the training set, # {} in test set".format(
-            len(self.train_dataset),
-            len(self.test_dataset)
-        ))
+        self.test_dataset = [json.loads(row['INTERACTIONS']) for row in self.dataset[split_index:]]
+        print(
+            f"# {len(self.train_dataset)} events in the training set, # {len(self.test_dataset)} in test set"
+        )
         # TODO: prepare train and test and initialize the dataset using reclist abstraction
-        data = {}
-        data["x_train"] = self.train_dataset
-        data["x_test"] = [_[:-1] for _ in self.test_dataset]
-        data["y_test"] = [[_[-1]] for _ in self.test_dataset]
-        data["x_validation"] = [_[:-1] for _ in self.test_dataset]
-        data["y_validation"] = [[_[-1]] for _ in self.test_dataset]
-        data["catalog"] = {}
+        data = {
+            "x_train": self.train_dataset,
+            "x_test": [_[:-1] for _ in self.test_dataset],
+            "y_test": [[_[-1]] for _ in self.test_dataset],
+            "x_validation": [_[:-1] for _ in self.test_dataset],
+            "y_validation": [[_[-1]] for _ in self.test_dataset],
+            "catalog": {},
+        }
         self.session_dataset = SessionDataset(data=data)
         self.next(self.train_model)
 
@@ -281,7 +285,6 @@ class dbtFlow(FlowSpec):
                     'EN_BATCH': os.getenv('EN_BATCH'),
                     'COMET_API_KEY': os.getenv('COMET_API_KEY')
                 })
-    # TODO: os.getenv may not work when we resume instead of starting from scracth
     @enable_decorator(batch(gpu=1, memory=80000, image=os.getenv('TRAIN_STEP_IMAGE')),
                       flag=os.getenv('EN_BATCH'))
     @pip(libraries={'reclist': '0.2.3', 'comet-ml': '3.26.0', 'numpy': '1.19.0'}) # numpy is there to avoid TF complaining
@@ -338,7 +341,7 @@ class dbtFlow(FlowSpec):
         # get last item as label;
         # TODO: Decrementing index here because 0 is reserved for masking; Find a better way around this.
         y_train = np.array([ s[-1]-1 for s in train_sessions_token])
-        print("NUMBER OF SESSIONS : {}".format(x_train.shape[0]))
+        print(f"NUMBER OF SESSIONS : {x_train.shape[0]}")
         print('First 3 x:', x_train[:3])
         print('First 3 y:', y_train[:3])
 
@@ -448,12 +451,12 @@ class dbtFlow(FlowSpec):
         else:
             from sagemaker.tensorflow import TensorFlowModel
             # generate a signature for the endpoint, using timestamp as a convention
-            ENDPOINT_NAME = 'nep-{}-endpoint'.format(int(round(time.time() * 1000)))
-            print("\n\n================\nEndpoint name is: {}\n\n".format(ENDPOINT_NAME))
+            ENDPOINT_NAME = f'nep-{int(round(time.time() * 1000))}-endpoint'
+            print(f"\n\n================\nEndpoint name is: {ENDPOINT_NAME}\n\n")
 
             # local temp file names
-            model_name = "nep-model-{}/1".format(current.run_id)
-            local_tar_name = 'model-{}.tar.gz'.format(current.run_id)
+            model_name = f"nep-model-{current.run_id}/1"
+            local_tar_name = f'model-{current.run_id}.tar.gz'
             # load model
             nep_model = model_from_json(self.model['model'])
             nep_model.set_weights(self.model['model_weights'])
@@ -469,7 +472,7 @@ class dbtFlow(FlowSpec):
                 data = in_file.read()
                 with S3(run=self) as s3:
                     url = s3.put(local_tar_name, data)
-                    print("Model saved at: {}".format(url))
+                    print(f"Model saved at: {url}")
                     # save this path for downstream reference!
                     self.model_s3_path = url
                     # remove local compressed model

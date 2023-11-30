@@ -110,11 +110,11 @@ class dbtCloudRunner():
         # loop and check every 10 seconds the status of the job
         while True:
             job_run_status = self._get_job_run_status(job_run_id)
-            print("Job status at {}: {}".format(datetime.utcnow(), job_run_status))
+            print(f"Job status at {datetime.utcnow()}: {job_run_status}")
             if job_run_status == dbtStatus['SUCCESS'].value:
-                print("dbt cloud job successfully completed at: {}".format(datetime.utcnow()))
+                print(f"dbt cloud job successfully completed at: {datetime.utcnow()}")
                 break
             elif job_run_status in (dbtStatus['ERROR'].value, dbtStatus['CANCELLED'].value):
-                raise Exception("dbt cloud job failed at: {}".format(datetime.utcnow()))
+                raise Exception(f"dbt cloud job failed at: {datetime.utcnow()}")
             #sleep on it
             time.sleep(10)
