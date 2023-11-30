@@ -32,8 +32,7 @@ def create_schema(
     snowflake_db: str,
     snowflake_schema: str,
     ):
-    sql_query = "create schema IF NOT EXISTS {}.{};".format(snowflake_db.upper(),
-                                                            snowflake_schema.upper())
+    sql_query = f"create schema IF NOT EXISTS {snowflake_db.upper()}.{snowflake_schema.upper()};"
 
     return snowflake_client.execute_query(sql_query)
 
@@ -74,7 +73,7 @@ def use_database(
     snowflake_client: SnowflakeClient, 
     snowflake_db: str
     ):
-    sql_query = "USE DATABASE {};".format(snowflake_db.upper())
+    sql_query = f"USE DATABASE {snowflake_db.upper()};"
 
     return snowflake_client.execute_query(sql_query)
 
@@ -86,12 +85,7 @@ def stage_data(
     data_file: str,
     data_folder: str
     ):
-    sql_query = "PUT file://{}/{} @{}.%{} auto_compress=true overwrite=true".format(
-        data_folder,
-        data_file,
-        snowflake_schema.upper(),
-        snowflake_table.upper()
-        )
+    sql_query = f"PUT file://{data_folder}/{data_file} @{snowflake_schema.upper()}.%{snowflake_table.upper()} auto_compress=true overwrite=true"
 
     return snowflake_client.execute_query(sql_query, is_debug=True)
 
@@ -151,7 +145,7 @@ def prepare_shopping_data(
     print("Preparing shopping data locally...")
     data_file = 'coveo_dataset_dump.csv'
     etl_timestamp = int(time.time() * 1000)
-    etl_id = str(uuid.uuid4()) 
+    etl_id = str(uuid.uuid4())
     coveo_dataset = CoveoDataset()
     # folder = '/Users/jacopotagliabue/Documents/repos/post-modern-data-stack-private/src'
     # pre-process only the training set as it's big enough already!
@@ -161,18 +155,19 @@ def prepare_shopping_data(
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         training_set = coveo_dataset.x_train[:max_sessions] if max_sessions else coveo_dataset.x_train
-        print("Training set has {} sessions".format(len(training_set)))
+        print(f"Training set has {len(training_set)} sessions")
         for session in training_set:
             for event in session:
-                row = {}
                 epoch_as_seconds = int(int(event['server_timestamp_epoch_ms']) / 1000.0)
-                event_date = datetime.fromtimestamp(epoch_as_seconds).strftime("%Y-%m-%d") 
-                row['etl_timestamp'] = etl_timestamp
-                row['etl_id'] = etl_id
-                row['event_date'] =  event_date
-                row['api_key'] = api_key
-                row['event_type'] = event['event_type']
-                row['raw_data'] = json.dumps(event)
+                event_date = datetime.fromtimestamp(epoch_as_seconds).strftime("%Y-%m-%d")
+                row = {
+                    'etl_timestamp': etl_timestamp,
+                    'etl_id': etl_id,
+                    'event_date': event_date,
+                    'api_key': api_key,
+                    'event_type': event['event_type'],
+                    'raw_data': json.dumps(event),
+                }
                 writer.writerow(row)
 
     return data_file
@@ -186,7 +181,7 @@ def upload_data_to_snowflake(
     max_sessions: int, # IF SPECIFIED, ONLY USE THE FIRST N SESSIONS IN THE COVEO DATASET 
     api_key: str # simulate a typical b2b stack, this acts as a partition key on the append-only table
 ):
-    print('Starting ops at {} '.format(datetime.utcnow()))
+    print(f'Starting ops at {datetime.utcnow()} ')
     # first, create schema
     create_schema(snowflake_client, snowflake_db, snowflake_schema)
     # create a temp dir to download dataset using recList and create 
@@ -203,7 +198,7 @@ def upload_data_to_snowflake(
             data_file=data_file
             )
 
-    print('All done, see you, space cowboy {} '.format(datetime.utcnow()))
+    print(f'All done, see you, space cowboy {datetime.utcnow()} ')
     return
 
 

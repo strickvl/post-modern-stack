@@ -31,8 +31,8 @@ class SnowflakeClient:
 
     def execute_query(self, query, params=None, is_debug=False):
         if is_debug:
-            print("EXECUTING: \n{}\n".format(query))
-            
+            print(f"EXECUTING: \n{query}\n")
+
         is_executed = True
         cs = self.snowflake_client.cursor(DictCursor)
         try:
@@ -57,6 +57,6 @@ class SnowflakeClient:
             cs.close()
 
         if rows and debug:
-            print('SF debug: # rows {}, first {}'.format(len(rows), rows[0]))
+            print(f'SF debug: # rows {len(rows)}, first {rows[0]}')
 
         return rows
